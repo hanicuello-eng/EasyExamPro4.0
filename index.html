@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plataforma de Evaluaciones</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Librería SheetJS para exportar reportes a Excel (.xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Librería QRCode.js para generar códigos QR -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- ========================================== -->
+  <!-- MÓDULO DE LOGIN (HÍBRIDO: DOCENTE / ALUMNO) -->
+  <!-- ========================================== -->
+  <div id="loginModule" class="container">
+    <div class="card login-card">
+      <h2>🎓 Plataforma de Evaluaciones</h2>
+      
+      <!-- Selector de Rol -->
+      <div class="role-selector">
+        <button type="button" id="roleTeacherBtn" class="role-btn active" onclick="switchLoginRole('teacher')">Docente</button>
+        <button type="button" id="roleStudentBtn" class="role-btn" onclick="switchLoginRole('student')">Estudiante</button>
+      </div>
+
+      <!-- Formulario Docente -->
+      <form id="teacherLoginForm">
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 15px;">
+          Ingresa tus credenciales para administrar exámenes y grupos.
+        </p>
+        <div class="form-group">
+          <label for="loginTeacherUser">Usuario / Docente:</label>
+          <input type="text" id="loginTeacherUser" placeholder="Ej: Luisa Arango" required>
+        </div>
+        <div class="form-group">
+          <label for="loginTeacherPass">Contraseña:</label>
+          <input type="password" id="loginTeacherPass" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">Ingresar como Docente</button>
+        <div style="text-align: center; margin-top: 15px;">
+          <a href="#" onclick="registerNewTeacher(); return false;" style="font-size: 0.85rem; color: var(--primary-color, #007bff);">¿Eres docente nuevo? Regístrate aquí</a>
+        </div>
+      </form>
+
+      <!-- Formulario Estudiante -->
+      <form id="studentLoginForm" class="hidden">
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 15px;">
+          Ingresa con tu nombre registrado y contraseña personal.
+        </p>
+        <div class="form-group">
+          <label for="loginStudentName">Nombre Completo:</label>
+          <input type="text" id="loginStudentName" placeholder="Tu nombre..." required>
+        </div>
+        <div class="form-group">
+          <label for="loginStudentPass">Contraseña:</label>
+          <input type="password" id="loginStudentPass" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">Ingresar al Examen</button>
+        <div style="text-align: center; margin-top: 15px;">
+          <a href="#" onclick="registerNewStudent(); return false;" style="font-size: 0.85rem; color: var(--primary-color, #007bff);">¿No tienes cuenta? Regístrate aquí</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MÓDULO DEL DOCENTE                         -->
+  <!-- ========================================== -->
+  <div id="teacherModule" class="hidden">
+    <header id="teacherHeader">
+      <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin: 0 auto; flex-wrap: wrap;">
+        <h1>Panel Docente: <span id="teacherWelcomeName">Docente</span></h1>
+        <button class="btn btn-secondary-sm" onclick="logoutTeacher()">🚪 Cerrar Sesión</button>
+      </div>
+      
+      <!-- BARRA DE NAVEGACIÓN -->
+      <nav class="teacher-nav">
+        <button class="nav-btn active" onclick="switchTab('examsTab')">📝 Exámenes</button>
+        <button class="nav-btn" onclick="switchTab('groupsTab')">👥 Grupos</button>
+        <button class="nav-btn" onclick="switchTab('configTab')">⚙️ Configuración</button>
+        <button class="nav-btn" onclick="switchTab('historyTab')">📊 Historial</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      
+      <!-- PESTAÑA 1: EXÁMENES -->
+      <div id="examsTab" class="tab-content active-tab">
+        <section id="examsBankSection" class="card">
+          <div class="section-header">
+            <h2>Banco de Exámenes</h2>
+            <div class="header-buttons">
+              <button class="btn" onclick="openExamCreator()">+ Crear Examen</button>
+            </div>
+          </div>
+          <div id="examsBankContainer"></div>
+        </section>
+
+        <!-- Creador y Editor de Exámenes -->
+        <section id="examCreatorSection" class="card hidden">
+          <h2 id="creatorTitle">Nuevo Examen</h2>
+          <input type="hidden" id="editingExamId" value="">
+          <div class="form-group">
+            <label for="examTitleInput">Título del Examen:</label>
+            <input type="text" id="examTitleInput" placeholder="Ej: Evaluación de Matemáticas - Periodo 1">
+          </div>
+          <div class="form-group">
+            <label for="examGroupSelect">Asignar a Grupo:</label>
+            <select id="examGroupSelect">
+              <option value="">-- Seleccionar Grupo --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="examTimeInput">Tiempo Límite (minutos):</label>
+            <input type="number" id="examTimeInput" value="30" min="1">
+          </div>
+          <div style="margin-bottom: 15px;">
+            <label for="examDeadlineInput" style="display: block; font-weight: 500; margin-bottom: 5px;">Fecha y Hora Límite (Plazo máximo):</label>
+            <input type="datetime-local" id="examDeadlineInput" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+          </div>
+          <div class="form-group">
+            <label for="examMediaInput">URL Recurso Multimedia (Opcional - Imagen/Video/Audio/Enlace):</label>
+            <input type="text" id="examMediaInput" placeholder="https://ejemplo.com/imagen.png">
+          </div>
+          <div class="form-group">
+            <label for="examRandomCountInput">Preguntas aleatorias a mostrar (0 para mostrar todas):</label>
+            <input type="number" id="examRandomCountInput" value="0" min="0">
+          </div>
+
+          <hr>
+
+          <h3>Agregar / Editar Pregunta</h3>
+          <div class="form-group">
+            <label for="newQuestionText">Enunciado de la Pregunta:</label>
+            <input type="text" id="newQuestionText" placeholder="Escribe el enunciado aquí...">
+          </div>
+          <div class="form-group">
+            <label for="newQuestionType">Tipo de Pregunta:</label>
+            <select id="newQuestionType" onchange="toggleOptionFields()">
+              <option value="multiple">Opción Múltiple</option>
+              <option value="open">Pregunta Abierta</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="newQuestionPoints">Puntos / Valor:</label>
+            <input type="number" id="newQuestionPoints" value="1" min="0.5" step="0.5">
+          </div>
+
+          <!-- Opciones dinámicas para pregunta múltiple -->
+          <div id="multipleOptionsBlock">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <small>Marca cuál opción es la correcta:</small>
+              <button type="button" class="btn btn-secondary-sm" onclick="addOptionField()">+ Añadir Opción</button>
+            </div>
+            <div id="dynamicOptionsContainer"></div>
+          </div>
+
+          <button class="btn btn-secondary" onclick="addQuestionToCurrentExam()" style="margin-top:12px;">+ Agregar Pregunta al Examen</button>
+
+          <hr>
+
+          <h3>Preguntas Agregadas:</h3>
+          <div id="currentExamQuestionsList"></div>
+
+          <div class="actions-right" style="margin-top: 15px;">
+            <button class="btn" onclick="saveExamToBank()">Guardar Examen</button>
+            <button class="btn btn-danger-sm" onclick="closeExamCreator()">Cancelar</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- PESTAÑA 2: GRUPOS -->
+      <div id="groupsTab" class="tab-content hidden-tab">
+        <section id="groupsSection" class="card">
+          <h2>Gestión de Grupos e Integrantes</h2>
+          <p style="color: var(--text-muted, #666); font-size: 0.9rem; margin-bottom: 15px;">
+            Crea grupos y haz clic sobre cualquiera de ellos para ver la lista de estudiantes inscritos.
+          </p>
+          <div class="form-group" style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <input type="text" id="newGroupNameInput" placeholder="Ej: 10-A, 10-B, Software 1...">
+            <button class="btn" onclick="addGroup()">+ Agregar Grupo</button>
+          </div>
+
+          <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <!-- Columna Izquierda: Grupos Registrados -->
+            <div style="flex: 1; min-width: 250px; background: #fdfdfd; padding: 15px; border-radius: 8px; border: 1px solid #e1e1e1;">
+              <h3 style="font-size: 1.1rem; margin-top: 0;">Mis Grupos</h3>
+              <div id="groupsListContainer" style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;"></div>
+            </div>
+
+            <!-- Columna Derecha: Integrantes del Grupo Seleccionado -->
+            <div style="flex: 1.5; min-width: 280px; background: #fdfdfd; padding: 15px; border-radius: 8px; border: 1px solid #e1e1e1;">
+              <h3 id="groupMembersTitle" style="font-size: 1.1rem; margin-top: 0; color: var(--primary-color, #007bff);">Integrantes del Grupo</h3>
+              <div id="groupMembersContainer">
+                <p style="color: #666; font-style: italic; font-size: 0.9rem;">Selecciona un grupo de la izquierda para ver sus estudiantes.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- PESTAÑA 3: CONFIGURACIÓN -->
+      <div id="configTab" class="tab-content hidden-tab">
+        <section id="profileSection" class="card">
+          <h2>Perfil y Credenciales Docente</h2>
+          <div class="profile-content" style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+            <div class="avatar-container" style="text-align: center;">
+              <img id="avatarImage" src="https://via.placeholder.com/100" alt="Avatar Docente" class="avatar" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 10px;">
+              <input type="file" id="avatarInput" accept="image/*" style="display: block; font-size: 0.8rem;">
+            </div>
+            <div class="profile-inputs" style="flex: 1; min-width: 250px;">
+              <div class="form-group">
+                <label>Nombre de Usuario / Docente:</label>
+                <input type="text" id="profNameInput" placeholder="Nombre de usuario" onchange="updateProfile()">
+              </div>
+              <div class="form-group">
+                <label>Contraseña de Acceso:</label>
+                <input type="password" id="profPassInput" placeholder="Nueva contraseña" onchange="updateProfile()">
+              </div>
+              <div class="form-group">
+                <label>Materia / Asignatura:</label>
+                <input type="text" id="profSubjectInput" placeholder="Materia / Asignatura" onchange="updateProfile()">
+              </div>
+              <div class="form-group">
+                <label>Descripción / Biografía corta:</label>
+                <textarea id="profBioInput" placeholder="Descripción corta" onchange="updateProfile()" style="width: 100%; min-height: 80px;"></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- PESTAÑA 4: HISTORIAL -->
+      <div id="historyTab" class="tab-content hidden-tab">
+        <section id="historySection" class="card">
+          <div class="section-header">
+            <h2>Historial por Examen</h2>
+          </div>
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="historyExamFilter">Seleccionar Examen para Ver Historial:</label>
+            <select id="historyExamFilter"></select>
+          </div>
+          <div id="historyListContainer"></div>
+        </section>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MÓDULO DEL ESTUDIANTE                      -->
+  <!-- ========================================== -->
+  <div id="studentModule" class="hidden">
+    <header style="text-align: center; padding: 20px 0; background: #fff; border-bottom: 1px solid #ddd; margin-bottom: 20px;">
+      <h2>Panel del Estudiante: <span id="studentWelcomeName">Estudiante</span></h2>
+      <button class="btn btn-secondary-sm" onclick="logoutStudent()" style="margin-top: 10px;">🚪 Cerrar Sesión</button>
+    </header>
+
+    <main class="container">
+      
+      <!-- Vista 1: Dashboard de Exámenes Disponibles -->
+      <div id="studentDashboardView" class="card">
+        <h3>Exámenes Asignados a tu Grupo</h3>
+        <div id="studentExamsContainer" style="margin-top: 15px;"></div>
+      </div>
+
+      <!-- Vista 2: Ejecución / Resolución del Examen -->
+      <div id="studentExamExecutionView" class="card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+          <h3 id="execExamTitle" style="margin: 0;"></h3>
+          <div id="execTimerDisplay" style="font-size: 1.2rem; font-weight: bold; color: #d9534f;">⏱️ 00:00</div>
+        </div>
+
+        <div id="execQuestionsContainer"></div>
+
+        <button type="button" class="btn" onclick="enviarExamen(false)" style="width: 100%; margin-top: 15px;">Finalizar y Entregar Evaluación</button>
+      </div>
+
+      <!-- Contenedor para el resumen individual al terminar el examen -->
+      <div id="studentResultSection" class="hidden container mt-4">
+        <!-- Aquí se inyectará dinámicamente el HTML del resumen -->
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODALES ADICIONALES (VISTA PREVIA, QR, ETC.)-->
+  <!-- ========================================== -->
+
+  <!-- Modal de Vista Previa / Simulacro -->
+  <div id="previewModal" class="hidden modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
+    <div class="card" style="width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; background: white;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+        <h3 style="margin: 0; color: #007bff;">👁️ Vista Previa (Simulacro)</h3>
+        <button class="btn btn-secondary-sm" onclick="closePreviewModal()">✕ Cerrar</button>
+      </div>
+      <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Este modo es de prueba libre. No guarda resultados ni afecta las estadísticas oficiales.</p>
+      <div id="previewContentContainer"></div>
+    </div>
+  </div>
+
+  <!-- Modal de Compartir (Link y Código QR) -->
+  <div id="shareModal" class="hidden modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
+    <div class="card" style="width: 90%; max-width: 450px; text-align: center; background: white;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+        <h3 style="margin: 0;">🔗 Compartir Examen</h3>
+        <button class="btn btn-secondary-sm" onclick="closeShareModal()">✕</button>
+      </div>
+      <p style="font-size: 0.9rem; color: #555;">Escanea el código QR o copia el enlace directo para enviar el examen:</p>
+      
+      <div id="qrcodeContainer" style="display: flex; justify-content: center; margin: 15px 0;"></div>
+      
+      <div class="form-group" style="text-align: left;">
+        <label>Enlace Directo:</label>
+        <div style="display: flex; gap: 5px;">
+          <input type="text" id="shareLinkInput" readonly style="flex: 1; font-size: 0.8rem;">
+          <button class="btn btn-secondary-sm" onclick="copyShareLink()">Copiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Respuestas Recibidas -->
+  <div id="responsesModal" class="hidden modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
+    <div class="card" style="width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; background: white;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+        <h3 id="responsesModalTitle" style="margin: 0;">📥 Respuestas Recibidas</h3>
+        <button class="btn btn-secondary-sm" onclick="closeResponsesModal()">✕ Cerrar</button>
+      </div>
+      <div id="responsesListContainer"></div>
+    </div>
+  </div>
+
+  <!-- Scripts SDK de Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
